@@ -124,35 +124,32 @@ This will:
 - Generate individual result files for each WSI
 - Create a summary report
 
-#### Patch Extraction
+#### Annotated Patch Creation
 
-After running the pipeline, you can extract all patches containing predictions:
+After running the pipeline, you can create annotated patches with all predictions:
 
 ```bash
-# Extract all patches with predictions (no limit)
-python extract_patches_with_predictions.py
-
 # Create annotated patches for all predictions
 python create_annotated_patches.py
 ```
 
 This will:
 - Extract ALL patches that contain predictions (not just 10-20)
-- Create both original and annotated versions
-- Use grid-based naming: `wsi_name.patch_i.patch_j_[type].png`
-- Generate comprehensive visualizations
+- Create annotated versions with prediction visualizations
+- Use grid-based naming: `wsi_name.patch_i.patch_j_annotated.png`
+- Generate comprehensive visualizations and statistics
 
 ### Patch Naming Convention
 
 Patches are named using the following format:
 - **Base WSI name**: Extracted from the WSI filename
 - **Grid coordinates**: `patch_i.patch_j` where i,j are the patch numbers in the 512x512 grid
-- **Type suffix**: `_real` for original patches, `_annotated` for annotated versions
+- **Type suffix**: `_annotated` for annotated versions with predictions
 
-Example: `19_ibd_mod_S037__20240822_091343.patch_23.45_real.png`
+Example: `19_ibd_mod_S037__20240822_091343.patch_23.45_annotated.png`
 - WSI: `19_ibd_mod_S037__20240822_091343`
 - Grid position: patch (23, 45) in the 512x512 grid
-- Type: real (original) patch
+- Type: annotated patch with prediction visualizations
 
 ## 🔧 Configuration
 
