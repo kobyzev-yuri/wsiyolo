@@ -80,6 +80,7 @@ pip install -r requirements.txt
 
 ### Basic Usage
 
+#### Full WSI Processing
 1. **Prepare your models**: Place your YOLO model files in the `models/` directory
 2. **Configure models**: Update the model configuration in your script
 3. **Run the pipeline**: Execute the main processing script
@@ -98,8 +99,35 @@ models_config = [
 # Initialize pipeline
 pipeline = WSIYOLOPipeline(models_config)
 
-# Process WSI
+# Process full WSI
 results = pipeline.process_wsi("path/to/your.wsi", "output_directory")
+```
+
+#### Biopsy-Specific Processing (6x Faster)
+```bash
+# 1. Detect and number biopsies
+python biopsy_detection/simple_biopsy_analysis.py
+
+# 2. Create biopsy grid
+python create_biopsy_grid.py
+
+# 3. Select specific biopsy (1-6)
+python select_biopsy_for_processing.py --biopsy-id 1
+
+# 4. Process only selected biopsy
+python run_biopsy_processing.py --biopsy-id 1
+```
+
+#### Advanced Biopsy Detection
+```bash
+# AI-powered biopsy detection
+python biopsy_detection/analyze_wsi_biopsy_detection.py
+
+# Cluster-based analysis
+python biopsy_detection/cluster_biopsy_analysis.py
+
+# Manual biopsy definition
+python biopsy_detection/manual_biopsy_analysis.py
 ```
 
 ## 📁 Project Structure
@@ -112,6 +140,13 @@ wsiyolo/
 │   ├── yolo_inference.py        # YOLO model inference
 │   ├── polygon_merger.py        # Prediction merging logic
 │   └── simple_patch_loader.py   # Patch extraction utilities
+├── biopsy_detection/             # Biopsy detection scripts
+│   ├── analyze_wsi_biopsy_detection.py  # AI-based biopsy detection
+│   ├── cluster_biopsy_analysis.py      # Cluster analysis for biopsies
+│   ├── detect_wsi_grid.py              # Grid detection on WSI
+│   ├── simple_biopsy_analysis.py       # Simple biopsy analysis
+│   ├── manual_biopsy_analysis.py       # Manual biopsy definition
+│   └── README.md                       # Biopsy detection documentation
 ├── models/                       # YOLO model files (not included in repo)
 ├── wsi/                         # WSI files (not included in repo)
 ├── results/                     # Output results (not included in repo)
@@ -119,6 +154,11 @@ wsiyolo/
 ├── visualization/               # Visualization utilities
 ├── docs/                        # Documentation
 ├── requirements.txt             # Python dependencies
+├── BIopsy_Processing_Guide.md   # Biopsy processing guide
+├── create_biopsy_grid.py      # Create numbered biopsy grid
+├── select_biopsy_for_processing.py  # Select specific biopsy
+├── run_biopsy_processing.py    # Process selected biopsy
+├── select_optimal_biopsy.py    # Select optimal biopsy
 └── README.md                    # This file
 ```
 
@@ -187,6 +227,63 @@ The pipeline provides comprehensive statistics:
 - Predictions per class
 - Average confidence scores
 - Processing time and performance metrics
+
+## 🔍 Biopsy Detection
+
+The project includes advanced biopsy detection capabilities for optimizing WSI processing:
+
+### Automatic Detection Methods
+- **AI-based Detection**: Uses GPT-4o/Gemini for intelligent biopsy identification
+- **Cluster Analysis**: Groups tissue components into biopsy regions using K-Means
+- **Grid Detection**: Finds optimal grid lines passing through empty tissue areas
+- **Simple Analysis**: Assumes identical biopsies for rapid processing
+
+### Manual Detection
+- **Interactive Analysis**: Manual definition of biopsy regions with visualization
+- **Correction Tools**: Fix automatic detection results when needed
+
+### Usage
+```bash
+# AI-based detection
+python biopsy_detection/analyze_wsi_biopsy_detection.py
+
+# Cluster analysis
+python biopsy_detection/cluster_biopsy_analysis.py
+
+# Grid detection
+python biopsy_detection/detect_wsi_grid.py
+
+# Simple analysis
+python biopsy_detection/simple_biopsy_analysis.py
+
+# Manual analysis
+python biopsy_detection/manual_biopsy_analysis.py
+```
+
+### Biopsy Processing with Keys
+The project supports processing specific biopsies using biopsy keys for 6x speedup:
+
+```bash
+# Create biopsy grid (numbers biopsies 1-6)
+python create_biopsy_grid.py
+
+# Select specific biopsy for processing
+python select_biopsy_for_processing.py --biopsy-id 1
+
+# Run processing on selected biopsy only
+python run_biopsy_processing.py --biopsy-id 1
+
+# Select optimal biopsy (closest to origin)
+python select_optimal_biopsy.py
+```
+
+### Biopsy Key Benefits
+- **6x Speedup**: Process only 1/6 of the WSI area
+- **Focused Analysis**: Concentrate on specific biopsy regions
+- **Resource Efficiency**: Reduced memory and processing requirements
+- **Quality Control**: Easier validation on smaller regions
+
+For detailed information, see `BIopsy_Processing_Guide.md` and `biopsy_detection/README.md`.
 
 ## 🧠 Technical Details
 
