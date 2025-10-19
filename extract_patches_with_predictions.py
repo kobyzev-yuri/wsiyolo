@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Извлечение реальных патчей с предсказаниями из WSI используя PIL
+Извлечение всех патчей с предсказаниями из WSI
+Полезно для обучения и анализа
 """
 
 import json
@@ -9,7 +10,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
-import io
 
 def load_predictions(json_path):
     """Загружает предсказания из JSON"""
@@ -35,39 +35,23 @@ def get_class_colors():
     
     return dict(zip(classes, colors))
 
-def extract_patch_from_tiff(tiff_path, x, y, size=512):
-    """Извлекает патч из TIFF файла используя PIL"""
+def extract_patch_from_wsi(wsi_path, x, y, size=512):
+    """Извлекает патч из WSI"""
     try:
-        # Открываем TIFF файл
-        with Image.open(tiff_path) as img:
-            # Получаем размеры изображения
-            img_width, img_height = img.size
-            print(f"     Размер WSI: {img_width}x{img_height}")
-            
-            # Проверяем, что координаты в пределах изображения
-            if x >= img_width or y >= img_height:
-                print(f"     ⚠️  Координаты ({x}, {y}) вне изображения")
-                return None
-            
-            # Обрезаем до размера изображения
-            right = min(x + size, img_width)
-            bottom = min(y + size, img_height)
-            
-            # Извлекаем патч
-            patch = img.crop((x, y, right, bottom))
-            
-            # Конвертируем в RGB если нужно
-            if patch.mode != 'RGB':
-                patch = patch.convert('RGB')
-            
-            # Конвертируем в numpy array
-            patch_array = np.array(patch)
-            
-            print(f"     ✅ Извлечен патч {patch_array.shape}")
-            return patch_array
-            
+        import openslide
+        slide = openslide.OpenSlide(wsi_path)
+        
+        # Извлекаем патч на уровне 0 (полное разрешение)
+        patch = slide.read_region((int(x), int(y)), 0, (size, size))
+        patch = np.array(patch.convert('RGB'))
+        
+        slide.close()
+        return patch
+    except ImportError:
+        print("⚠️  openslide не установлен")
+        return None
     except Exception as e:
-        print(f"     ⚠️  Ошибка извлечения патча: {e}")
+        print(f"⚠️  Ошибка загрузки WSI: {e}")
         return None
 
 def group_predictions_by_patches(predictions):
@@ -86,6 +70,17 @@ def group_predictions_by_patches(predictions):
         patch_groups[patch_key].append(pred)
     
     return patch_groups
+
+def get_patch_grid_coordinates(patch_x, patch_y, patch_size=512):
+    """Получает координаты патча в сетке (i, j)"""
+    i = int(patch_x // patch_size)
+    j = int(patch_y // patch_size)
+    return i, j
+
+def get_wsi_base_name(wsi_path):
+    """Получает базовое имя WSI файла без расширения"""
+    from pathlib import Path
+    return Path(wsi_path).stem
 
 def create_annotated_patch(patch_image, predictions, patch_coords, class_colors):
     """Создает аннотированный патч"""
@@ -146,8 +141,8 @@ def create_annotated_patch(patch_image, predictions, patch_coords, class_colors)
     plt.tight_layout()
     return fig
 
-def extract_patches_with_predictions(json_path, tiff_path, output_dir="real_patches", max_patches=10):
-    """Извлекает реальные патчи с предсказаниями"""
+def extract_patches_with_predictions(json_path, wsi_path, output_dir="patches_with_predictions", max_patches=None):
+    """Извлекает все патчи с предсказаниями"""
     
     print("🔍 Загрузка предсказаний...")
     data = load_predictions(json_path)
@@ -173,7 +168,14 @@ def extract_patches_with_predictions(json_path, tiff_path, output_dir="real_patc
     
     # Сортируем по количеству предсказаний
     sorted_patches = sorted(target_patches.items(), key=lambda x: len(x[1]), reverse=True)
-    selected_patches = sorted_patches[:max_patches]
+    
+    # Если max_patches не указан, берем все патчи
+    if max_patches is None:
+        selected_patches = sorted_patches
+        print(f"   Извлекаем ВСЕ патчи с предсказаниями: {len(selected_patches)}")
+    else:
+        selected_patches = sorted_patches[:max_patches]
+        print(f"   Извлекаем топ-{max_patches} патчей с наибольшим количеством предсказаний")
     
     # Создаем выходную директорию
     output_path = Path(output_dir)
@@ -182,15 +184,21 @@ def extract_patches_with_predictions(json_path, tiff_path, output_dir="real_patc
     # Получаем цвета для классов
     class_colors = get_class_colors()
     
-    print(f"🔧 Извлечение реальных патчей...")
+    print(f"🔧 Извлечение патчей с предсказаниями...")
     
     successful_patches = 0
     
+    # Получаем базовое имя WSI
+    wsi_base_name = get_wsi_base_name(wsi_path)
+    
     for i, ((patch_x, patch_y), patch_predictions) in enumerate(selected_patches):
-        print(f"   Обработка патча {i+1}/{len(selected_patches)}: ({patch_x}, {patch_y}) - {len(patch_predictions)} предсказаний")
+        # Получаем координаты патча в сетке
+        patch_i, patch_j = get_patch_grid_coordinates(patch_x, patch_y)
         
-        # Извлекаем патч из TIFF
-        patch_image = extract_patch_from_tiff(tiff_path, patch_x, patch_y)
+        print(f"   Обработка патча {i+1}/{len(selected_patches)}: ({patch_x}, {patch_y}) -> grid({patch_i}, {patch_j}) - {len(patch_predictions)} предсказаний")
+        
+        # Извлекаем патч из WSI
+        patch_image = extract_patch_from_wsi(wsi_path, patch_x, patch_y)
         
         if patch_image is None:
             print(f"     ⚠️  Пропущен патч {i+1}: не удалось загрузить изображение")
@@ -199,28 +207,27 @@ def extract_patches_with_predictions(json_path, tiff_path, output_dir="real_patc
         # Создаем аннотированный патч
         fig = create_annotated_patch(patch_image, patch_predictions, (patch_x, patch_y), class_colors)
         
-        # Сохраняем
-        output_file = output_path / f"patch_{patch_x}_{patch_y}_real.png"
+        # Сохраняем с новым именем: wsi_name_i_j.png
+        output_file = output_path / f"{wsi_base_name}_{patch_i}_{patch_j}.png"
         fig.savefig(output_file, dpi=150, bbox_inches='tight')
         plt.close(fig)
         
         print(f"     ✅ Сохранено: {output_file}")
         successful_patches += 1
     
-    print(f"\n✅ Извлечено реальных патчей: {successful_patches}")
+    print(f"\n✅ Извлечено патчей с предсказаниями: {successful_patches}")
     print(f"   Результаты в директории: {output_path}")
     
     return output_path
 
 if __name__ == "__main__":
     json_path = "results/predictions.json"
-    tiff_path = "wsi/19_ibd_mod_S037__20240822_091343.tiff"
+    wsi_path = "wsi/19_ibd_mod_S037__20240822_091343.tiff"
     
-    print("🎨 Извлечение реальных патчей с предсказаниями (PIL)")
-    print("=" * 60)
+    print("🎨 Извлечение всех патчей с предсказаниями")
+    print("=" * 50)
     
-    # Извлекаем реальные патчи
-    output_dir = extract_patches_with_predictions(json_path, tiff_path, max_patches=5)
+    # Извлекаем все патчи с предсказаниями
+    output_dir = extract_patches_with_predictions(json_path, wsi_path, max_patches=None)
     
     print(f"\n🎉 Готово! Результаты в директории: {output_dir}")
-

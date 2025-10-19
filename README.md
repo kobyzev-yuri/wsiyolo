@@ -63,12 +63,25 @@ wsiyolo/
 │   ├── simple_patch_loader.py    # Basic patch loading
 │   ├── wsi_patch_loader.py       # Advanced WSI patch extraction
 │   └── yolo_inference.py         # YOLO model inference
+├── tests/                        # Test and debug scripts
+│   ├── README.md                 # Tests documentation
+│   ├── test_pipeline.py          # Main pipeline tests
+│   ├── test_polygon_fix.py       # Polygon processing tests
+│   ├── test_real_data_fix.py     # Real data validation tests
+│   ├── debug_pipeline.py         # Pipeline debugging
+│   └── analyze_polygon_detailed.py # Polygon analysis
+├── visualization/                # Visualization and statistics scripts
+│   ├── README.md                 # Visualization documentation
+│   ├── create_simple_annotations.py # WSI overview with predictions
+│   └── view_statistics.py        # Statistics analysis
 ├── models/                       # YOLO model files (.pt)
 ├── wsi/                         # WSI image files
 ├── results/                     # Output results
 ├── requirements.txt             # Python dependencies
 ├── run_pipeline.py              # Main execution script
 ├── process_all_wsi.py           # Batch processing script
+├── create_annotated_patches.py  # Annotated patch generation
+├── extract_patches_with_predictions.py # All patches extraction
 └── README.md                    # This documentation
 ```
 
@@ -138,6 +151,24 @@ This will:
 - Create annotated versions with prediction visualizations
 - Use grid-based naming: `wsi_name_i_j.png`
 - Generate comprehensive visualizations and statistics
+
+#### WSI Overview and Statistics
+
+Create overview visualizations and statistical analysis:
+
+```bash
+# Create WSI overview with all predictions
+python visualization/create_simple_annotations.py
+
+# View detailed statistics
+python visualization/view_statistics.py
+```
+
+This will:
+- Generate WSI overview images with all predictions overlaid
+- Create statistical charts showing class distributions
+- Provide detailed analysis of prediction confidence
+- Export comprehensive statistics for further analysis
 
 ### Patch Naming Convention
 
