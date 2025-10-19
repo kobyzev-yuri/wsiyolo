@@ -143,8 +143,8 @@ def group_predictions_by_patches(predictions):
 
 def get_patch_grid_coordinates(patch_x, patch_y, patch_size=512):
     """Получает координаты патча в сетке (i, j)"""
-    i = patch_x // patch_size
-    j = patch_y // patch_size
+    i = int(patch_x // patch_size)
+    j = int(patch_y // patch_size)
     return i, j
 
 def get_wsi_base_name(wsi_path):
@@ -210,8 +210,8 @@ def create_annotated_patches(json_path, wsi_path, output_dir="annotated_patches"
         # Создаем аннотированный патч
         fig = create_annotated_patch(patch_image, patch_predictions, (patch_x, patch_y), class_colors)
         
-        # Сохраняем с новым именем: wsi_name.patch_i.patch_j_annotated.png
-        output_file = output_path / f"{wsi_base_name}.patch_{patch_i}.{patch_j}_annotated.png"
+        # Сохраняем с новым именем: wsi_name_i_j.png
+        output_file = output_path / f"{wsi_base_name}_{patch_i}_{patch_j}.png"
         fig.savefig(output_file, dpi=150, bbox_inches='tight')
         plt.close(fig)
         

@@ -136,17 +136,17 @@ python create_annotated_patches.py
 This will:
 - Extract ALL patches that contain predictions (not just 10-20)
 - Create annotated versions with prediction visualizations
-- Use grid-based naming: `wsi_name.patch_i.patch_j_annotated.png`
+- Use grid-based naming: `wsi_name_i_j.png`
 - Generate comprehensive visualizations and statistics
 
 ### Patch Naming Convention
 
 Patches are named using the following format:
 - **Base WSI name**: Extracted from the WSI filename
-- **Grid coordinates**: `patch_i.patch_j` where i,j are the patch numbers in the 512x512 grid
-- **Type suffix**: `_annotated` for annotated versions with predictions
+- **Grid coordinates**: `_i_j` where i,j are integer patch numbers in the 512x512 grid
+- **File extension**: `.png` for annotated patches with predictions
 
-Example: `19_ibd_mod_S037__20240822_091343.patch_23.45_annotated.png`
+Example: `19_ibd_mod_S037__20240822_091343_23_45.png`
 - WSI: `19_ibd_mod_S037__20240822_091343`
 - Grid position: patch (23, 45) in the 512x512 grid
 - Type: annotated patch with prediction visualizations
