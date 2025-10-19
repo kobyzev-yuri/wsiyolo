@@ -168,7 +168,7 @@ class ImprovedMergerTester:
         """Создает вложенные объекты lp (должны быть исключены)"""
         predictions = []
         
-        # Большой lp объект
+        # Большой lp объект (должен остаться)
         big_box = Box(
             start=Coords(x=900, y=900),
             end=Coords(x=1100, y=1100)
@@ -188,7 +188,7 @@ class ImprovedMergerTester:
         )
         predictions.append(big_pred)
         
-        # Малый lp объект внутри большого (вложенный)
+        # Малый lp объект внутри большого (вложенный - должен быть исключен)
         small_box = Box(
             start=Coords(x=950, y=950),
             end=Coords(x=1050, y=1050)

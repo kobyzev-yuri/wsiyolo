@@ -159,19 +159,22 @@ class ImprovedPolygonMerger:
         if not polygons_with_predictions:
             return predictions
         
-        # Проверяем вложенность
+        # Сортируем по площади (от больших к маленьким)
+        polygons_with_predictions.sort(key=lambda x: x[0].area, reverse=True)
+        
+        # Проверяем вложенность - оставляем только самые большие объекты
         filtered_predictions = []
         
         for i, (poly1, pred1) in enumerate(polygons_with_predictions):
             is_nested = False
             
-            for j, (poly2, pred2) in enumerate(polygons_with_predictions):
-                if i != j:
-                    # Проверяем, вложен ли poly1 в poly2
-                    if poly1.within(poly2):
-                        print(f"   Исключен вложенный объект lp: {pred1.class_name}")
-                        is_nested = True
-                        break
+            # Проверяем только с уже отфильтрованными (большими) объектами
+            for j, (poly2, pred2) in enumerate(filtered_predictions):
+                # Проверяем, вложен ли poly1 в poly2
+                if poly1.within(poly2):
+                    print(f"   Исключен вложенный объект lp: площадь {poly1.area:.1f} вложена в {poly2.area:.1f}")
+                    is_nested = True
+                    break
             
             if not is_nested:
                 filtered_predictions.append(pred1)
