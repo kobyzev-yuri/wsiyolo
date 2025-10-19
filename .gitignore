@@ -41,19 +41,19 @@ experimental/
 test_images/
 results_backup/
 
-# Biopsy analysis files (experimental)
-*biopsy*
-*cluster*
-*detect*
-*fix*
-*manual*
-*optimal*
-*select*
-*simple*
-*corrected*
-*improved*
-*numbered*
-*visualization*
+# Biopsy analysis files (experimental) - specific patterns only
+*biopsy_analysis*
+*cluster_analysis*
+*detect_wsi_grid*
+*fix_biopsy*
+*manual_biopsy*
+*optimal_biopsy*
+*select_biopsy*
+*simple_biopsy*
+*corrected_biopsy*
+*improved_biopsy*
+*numbered_biopsy*
+*biopsy_visualization*
 
 # IDE
 .vscode/
