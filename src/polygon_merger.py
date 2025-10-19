@@ -9,7 +9,7 @@ from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import unary_union
 from shapely.validation import make_valid
 
-from .data_structures import Prediction, Coords, Box
+from data_structures import Prediction, Coords, Box
 
 
 class PolygonMerger:

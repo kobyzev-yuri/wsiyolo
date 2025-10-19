@@ -169,9 +169,26 @@ class ImprovedPolygonMerger:
             is_nested = False
             
             # Проверяем только с уже отфильтрованными (большими) объектами
-            for j, (poly2, pred2) in enumerate(filtered_predictions):
-                # Проверяем, вложен ли poly1 в poly2
-                if poly1.within(poly2):
+            for j, pred2 in enumerate(filtered_predictions):
+                # Создаем полигон для pred2
+                if pred2.polygon:
+                    coords2 = [(p.x, p.y) for p in pred2.polygon]
+                    poly2 = Polygon(coords2)
+                else:
+                    continue
+                # Проверяем различные типы вложенности
+                within_check = poly1.within(poly2)
+                contains_check = poly2.contains(poly1)
+                intersection_ratio = poly1.intersection(poly2).area / poly1.area if poly1.area > 0 else 0
+                
+                print(f"   Проверка вложенности: poly1({poly1.area:.1f}) vs poly2({poly2.area:.1f})")
+                print(f"     within: {within_check}, contains: {contains_check}, intersection_ratio: {intersection_ratio:.3f}")
+                
+                # Объект считается вложенным если:
+                # 1. Он полностью внутри другого (within)
+                # 2. Другой объект содержит его (contains) 
+                # 3. Большая часть его площади пересекается с другим объектом (>80%)
+                if within_check or contains_check or intersection_ratio > 0.8:
                     print(f"   Исключен вложенный объект lp: площадь {poly1.area:.1f} вложена в {poly2.area:.1f}")
                     is_nested = True
                     break

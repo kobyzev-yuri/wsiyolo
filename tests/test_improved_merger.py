@@ -169,16 +169,14 @@ class ImprovedMergerTester:
         """Создает вложенные объекты lp (должны быть исключены)"""
         predictions = []
         
-        # Большой lp объект (должен остаться)
+        # Большой lp объект (должен остаться) - простой прямоугольник
         big_box = Box(
             start=Coords(x=900, y=900),
             end=Coords(x=1100, y=1100)
         )
         big_polygon = [
             Coords(x=900, y=900), Coords(x=1100, y=900),
-            Coords(x=1100, y=1100), Coords(x=900, y=1100),
-            Coords(x=920, y=920), Coords(x=1080, y=920),
-            Coords(x=1080, y=1080), Coords(x=920, y=1080)
+            Coords(x=1100, y=1100), Coords(x=900, y=1100)
         ]
         
         big_pred = Prediction(
@@ -189,16 +187,14 @@ class ImprovedMergerTester:
         )
         predictions.append(big_pred)
         
-        # Малый lp объект внутри большого (вложенный - должен быть исключен)
+        # Малый lp объект полностью внутри большого (вложенный - должен быть исключен)
         small_box = Box(
             start=Coords(x=950, y=950),
             end=Coords(x=1050, y=1050)
         )
         small_polygon = [
             Coords(x=950, y=950), Coords(x=1050, y=950),
-            Coords(x=1050, y=1050), Coords(x=950, y=1050),
-            Coords(x=970, y=970), Coords(x=1030, y=970),
-            Coords(x=1030, y=1030), Coords(x=970, y=1030)
+            Coords(x=1050, y=1050), Coords(x=950, y=1050)
         ]
         
         small_pred = Prediction(
@@ -320,22 +316,33 @@ class ImprovedMergerTester:
         # Создаем предсказания с разным IoU
         predictions = []
         
-        # Предсказание 1
+        # Предсказание 1 (высокая уверенность)
         box1 = Box(start=Coords(x=100, y=100), end=Coords(x=200, y=200))
-        pred1 = Prediction(class_name="lp", box=box1, conf=0.9, polygon=None)
+        polygon1 = [Coords(x=100, y=100), Coords(x=200, y=100), Coords(x=200, y=200), Coords(x=100, y=200)]
+        pred1 = Prediction(class_name="lp", box=box1, conf=0.9, polygon=polygon1)
         predictions.append(pred1)
         
-        # Предсказание 2 с высоким IoU (должно быть исключено)
-        box2 = Box(start=Coords(x=150, y=150), end=Coords(x=250, y=250))
-        pred2 = Prediction(class_name="lp", box=box2, conf=0.8, polygon=None)
+        # Предсказание 2 с высоким IoU (должно быть исключено) - практически полное перекрытие
+        box2 = Box(start=Coords(x=105, y=105), end=Coords(x=195, y=195))
+        polygon2 = [Coords(x=105, y=105), Coords(x=195, y=105), Coords(x=195, y=195), Coords(x=105, y=195)]
+        pred2 = Prediction(class_name="lp", box=box2, conf=0.8, polygon=polygon2)
         predictions.append(pred2)
         
-        # Предсказание 3 с низким IoU (должно остаться)
+        # Предсказание 3 с низким IoU (должно остаться) - далеко от других
         box3 = Box(start=Coords(x=300, y=300), end=Coords(x=400, y=400))
-        pred3 = Prediction(class_name="lp", box=box3, conf=0.7, polygon=None)
+        polygon3 = [Coords(x=300, y=300), Coords(x=400, y=300), Coords(x=400, y=400), Coords(x=300, y=400)]
+        pred3 = Prediction(class_name="lp", box=box3, conf=0.7, polygon=polygon3)
         predictions.append(pred3)
         
         original_count = len(predictions)
+        
+        # Выводим IoU между предсказаниями для отладки
+        print(f"   IoU между предсказаниями:")
+        for i in range(len(predictions)):
+            for j in range(i+1, len(predictions)):
+                iou = predictions[i].box.iou(predictions[j].box)
+                print(f"     pred{i} vs pred{j}: IoU = {iou:.3f}")
+        
         filtered = self.merger.filter_by_improved_iou(predictions)
         filtered_count = len(filtered)
         

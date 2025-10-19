@@ -9,7 +9,7 @@ from ultralytics import YOLO
 import torch
 from shapely.geometry import Polygon
 
-from .data_structures import PatchInfo, Prediction, Model, Coords, Box
+from data_structures import PatchInfo, Prediction, Model, Coords, Box
 
 
 class YOLOInference:

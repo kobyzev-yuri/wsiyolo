@@ -10,10 +10,10 @@ from pathlib import Path
 import time
 from tqdm import tqdm
 
-from .data_structures import Model, WSIInfo, Prediction
-from .simple_patch_loader import SimplePatchLoader
-from .yolo_inference import YOLOInference
-from .polygon_merger import PolygonMerger
+from data_structures import Model, WSIInfo, Prediction
+from simple_patch_loader import SimplePatchLoader
+from yolo_inference import YOLOInference
+from polygon_merger import PolygonMerger
 
 
 class WSIYOLOPipeline:

@@ -137,6 +137,53 @@ This will:
 - Generate individual result files for each WSI
 - Create a summary report
 
+### Performance Configuration
+
+The improved pipeline supports configurable batch processing for optimal performance on different hardware:
+
+#### Hardware-Specific Settings
+
+| GPU Memory | Batch Size | Workers | Expected Speed | Use Case |
+|-------------|------------|---------|----------------|----------|
+| 4-8 GB      | 8          | 2       | ~8-12 патчей/сек | Development, testing |
+| 8-16 GB     | 16         | 4       | ~20-25 патчей/сек | **Recommended for most servers** |
+| 16+ GB      | 32         | 6       | ~30+ патчей/сек | High-performance servers |
+
+#### Configuration Examples
+
+```python
+# Low-memory configuration (4-8GB GPU)
+pipeline = ImprovedWSIYOLOPipeline(
+    model_paths=model_paths,
+    batch_size=8,
+    max_workers=2
+)
+
+# Balanced configuration (8-16GB GPU) - RECOMMENDED
+pipeline = ImprovedWSIYOLOPipeline(
+    model_paths=model_paths,
+    batch_size=16,
+    max_workers=4
+)
+
+# High-performance configuration (16+ GB GPU)
+pipeline = ImprovedWSIYOLOPipeline(
+    model_paths=model_paths,
+    batch_size=32,
+    max_workers=6
+)
+```
+
+#### Performance Testing
+
+```bash
+# Test different configurations
+python test_improved_pipeline.py
+
+# Compare with original pipeline
+python compare_pipelines.py
+```
+
 #### Annotated Patch Creation
 
 After running the pipeline, you can create annotated patches with all predictions:

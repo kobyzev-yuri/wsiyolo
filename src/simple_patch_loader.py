@@ -8,7 +8,7 @@ from typing import List, Tuple
 import cucim
 from cucim import CuImage
 
-from .data_structures import PatchInfo, WSIInfo, Coords
+from data_structures import PatchInfo, WSIInfo, Coords
 
 
 class SimplePatchLoader:
