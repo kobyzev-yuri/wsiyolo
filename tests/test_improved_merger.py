@@ -10,6 +10,7 @@ import os
 import numpy as np
 from pathlib import Path
 from typing import List
+from shapely.geometry import Polygon
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -291,11 +292,22 @@ class ImprovedMergerTester:
         predictions = self._create_nested_objects()
         original_count = len(predictions)
         
+        print(f"   Исходных предсказаний: {original_count}")
+        for i, pred in enumerate(predictions):
+            if pred.polygon:
+                coords = [(p.x, p.y) for p in pred.polygon]
+                poly = Polygon(coords)
+                print(f"   Объект {i}: площадь {poly.area:.1f}, координаты {pred.box.start.x}-{pred.box.end.x}, {pred.box.start.y}-{pred.box.end.y}")
+        
         filtered = self.merger._filter_nested_objects(predictions)
         filtered_count = len(filtered)
         
-        print(f"   Исходных предсказаний: {original_count}")
         print(f"   После фильтрации: {filtered_count}")
+        for i, pred in enumerate(filtered):
+            if pred.polygon:
+                coords = [(p.x, p.y) for p in pred.polygon]
+                poly = Polygon(coords)
+                print(f"   Сохраненный объект {i}: площадь {poly.area:.1f}")
         
         # Должен остаться только один объект (большой)
         assert filtered_count == 1, f"Вложенные объекты не были исключены: {filtered_count}"

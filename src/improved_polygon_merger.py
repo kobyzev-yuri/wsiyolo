@@ -178,6 +178,7 @@ class ImprovedPolygonMerger:
             
             if not is_nested:
                 filtered_predictions.append(pred1)
+                print(f"   Сохранен объект lp: площадь {poly1.area:.1f}")
         
         return filtered_predictions
     
