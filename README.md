@@ -105,29 +105,19 @@ results = pipeline.process_wsi("path/to/your.wsi", "output_directory")
 
 #### Biopsy-Specific Processing (6x Faster)
 ```bash
-# 1. Detect and number biopsies
-python biopsy_detection/simple_biopsy_analysis.py
+# РЕКОМЕНДУЕМЫЙ СПОСОБ - Единый workflow
+python create_biopsy_workflow.py --wsi-path path/to/your.wsi --biopsy-id 1
 
-# 2. Create biopsy grid
+# Альтернативно - пошагово:
+# 1. Детекция биопсий
+python detect_biopsies.py --wsi-path path/to/your.wsi --n-biopsies 6
+
+# 2. Создание сетки и выбор биопсии
 python create_biopsy_grid.py
-
-# 3. Select specific biopsy (1-6)
 python select_biopsy_for_processing.py --biopsy-id 1
 
-# 4. Process only selected biopsy
+# 3. Обработка выбранной биопсии
 python run_biopsy_processing.py --biopsy-id 1
-```
-
-#### Advanced Biopsy Detection
-```bash
-# AI-powered biopsy detection
-python biopsy_detection/analyze_wsi_biopsy_detection.py
-
-# Cluster-based analysis
-python biopsy_detection/cluster_biopsy_analysis.py
-
-# Manual biopsy definition
-python biopsy_detection/manual_biopsy_analysis.py
 ```
 
 ## 📁 Project Structure
@@ -140,12 +130,8 @@ wsiyolo/
 │   ├── yolo_inference.py        # YOLO model inference
 │   ├── polygon_merger.py        # Prediction merging logic
 │   └── simple_patch_loader.py   # Patch extraction utilities
-├── biopsy_detection/             # Biopsy detection scripts
-│   ├── analyze_wsi_biopsy_detection.py  # AI-based biopsy detection
-│   ├── cluster_biopsy_analysis.py      # Cluster analysis for biopsies
-│   ├── detect_wsi_grid.py              # Grid detection on WSI
-│   ├── simple_biopsy_analysis.py       # Simple biopsy analysis
-│   ├── manual_biopsy_analysis.py       # Manual biopsy definition
+├── biopsy_detection/             # Biopsy detection scripts (experimental)
+│   ├── simple_biopsy_analysis.py       # Simple biopsy analysis (recommended)
 │   └── README.md                       # Biopsy detection documentation
 ├── models/                       # YOLO model files (not included in repo)
 ├── wsi/                         # WSI files (not included in repo)
@@ -155,6 +141,8 @@ wsiyolo/
 ├── docs/                        # Documentation
 ├── requirements.txt             # Python dependencies
 ├── BIopsy_Processing_Guide.md   # Biopsy processing guide
+├── detect_biopsies.py          # РЕКОМЕНДУЕМЫЙ: Детекция биопсий
+├── create_biopsy_workflow.py   # РЕКОМЕНДУЕМЫЙ: Единый workflow
 ├── create_biopsy_grid.py      # Create numbered biopsy grid
 ├── select_biopsy_for_processing.py  # Select specific biopsy
 ├── run_biopsy_processing.py    # Process selected biopsy
@@ -242,40 +230,21 @@ The project includes advanced biopsy detection capabilities for optimizing WSI p
 - **Interactive Analysis**: Manual definition of biopsy regions with visualization
 - **Correction Tools**: Fix automatic detection results when needed
 
-### Usage
+### Рекомендуемый Pipeline
 ```bash
-# AI-based detection
-python biopsy_detection/analyze_wsi_biopsy_detection.py
+# ЕДИНЫЙ WORKFLOW (рекомендуется)
+python create_biopsy_workflow.py --wsi-path path/to/your.wsi --biopsy-id 1
 
-# Cluster analysis
-python biopsy_detection/cluster_biopsy_analysis.py
-
-# Grid detection
-python biopsy_detection/detect_wsi_grid.py
-
-# Simple analysis
-python biopsy_detection/simple_biopsy_analysis.py
-
-# Manual analysis
-python biopsy_detection/manual_biopsy_analysis.py
+# Только детекция биопсий
+python detect_biopsies.py --wsi-path path/to/your.wsi --n-biopsies 6
 ```
 
-### Biopsy Processing with Keys
-The project supports processing specific biopsies using biopsy keys for 6x speedup:
-
-```bash
-# Create biopsy grid (numbers biopsies 1-6)
-python create_biopsy_grid.py
-
-# Select specific biopsy for processing
-python select_biopsy_for_processing.py --biopsy-id 1
-
-# Run processing on selected biopsy only
-python run_biopsy_processing.py --biopsy-id 1
-
-# Select optimal biopsy (closest to origin)
-python select_optimal_biopsy.py
-```
+### Преимущества единого pipeline:
+- ✅ **Проверенный алгоритм** - находит все 6 биопсий
+- ✅ **Автоматическая нумерация** - по расстоянию от начала координат
+- ✅ **Единый интерфейс** - один скрипт для всех задач
+- ✅ **6x ускорение** - обрабатывается только 1/6 WSI
+- ✅ **Готов к интеграции** - с основным pipeline
 
 ### Biopsy Key Benefits
 - **6x Speedup**: Process only 1/6 of the WSI area
