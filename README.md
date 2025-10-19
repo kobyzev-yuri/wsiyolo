@@ -277,6 +277,316 @@ The merging algorithm uses geometric operations:
 2. **Polygon Union**: Uses Shapely library for geometric operations
 3. **Confidence Weighting**: Considers confidence scores in final decisions
 
+### Polygon Simplification Algorithm
+
+The pipeline includes a sophisticated polygon simplification algorithm that reduces complex segmentation masks to a maximum of 60 points while preserving important geometric features.
+
+#### Algorithm Parameters
+
+```python
+# Core simplification parameters
+max_points = 60                    # Maximum number of points in simplified polygon
+min_tolerance = 0.1               # Minimum tolerance for Douglas-Peucker algorithm
+max_tolerance = 10.0              # Maximum tolerance for Douglas-Peucker algorithm
+max_iterations = 10               # Maximum iterations for binary search
+target_ratio = 0.8                # Target point ratio (80% of max_points)
+```
+
+#### Algorithm Steps
+
+1. **Initial Check**: If polygon already has ≤60 points, return unchanged
+2. **Binary Search**: Find optimal tolerance using binary search (up to 10 iterations)
+3. **Validation**: Check if simplified polygon is valid and has >3 points
+4. **Fallback Sampling**: If still too many points, use uniform sampling
+5. **Quality Check**: Ensure final polygon is valid and maintains topology
+
+#### Known Issues and Limitations
+
+**⚠️ Current Problems:**
+- **Topology Loss**: Uniform sampling can break polygon topology
+- **Shape Distortion**: Aggressive simplification may alter object shape
+- **Invalid Polygons**: Over-simplification can create invalid geometries
+- **Suboptimal Tolerance**: Binary search may not find the best tolerance value
+
+**🔧 Debugging Information:**
+The algorithm provides detailed logging for troubleshooting:
+```python
+print(f"   Умное упрощение полигона: {len(coords)} -> {len(polygon)} точек")
+print(f"   После умного упрощения: {len(polygon.exterior.coords)} точек")
+```
+
+#### Recommended Improvements
+
+1. **Adaptive Tolerance**: Use polygon area to determine optimal tolerance
+2. **Key Point Preservation**: Prioritize corners and high-curvature points
+3. **Quality Metrics**: Compare area before/after simplification
+4. **Alternative Methods**: Implement different simplification strategies as fallbacks
+
+#### Testing and Validation
+
+To test the polygon simplification algorithm:
+
+```bash
+# Run polygon-specific tests
+python tests/test_polygon_fix.py
+
+# Analyze polygon processing in detail
+python tests/analyze_polygon_detailed.py
+```
+
+## 📊 Algorithm Flowchart
+
+For a detailed visual representation of the current multi-model YOLO prediction algorithm, see:
+
+- **[Complete Algorithm Flowchart](docs/algorithm_flowchart.md)** - Comprehensive diagram of all pipeline stages
+- **[Polygon Simplification Details](docs/polygon_simplification.md)** - Detailed polygon processing algorithm
+- **[Model Application Strategies](docs/current_algorithm_flowchart.md)** - Current vs optimized model processing approaches
+
+The flowchart documents:
+- **Current sequential processing** (patch-by-patch, model-by-model)
+- **Performance bottlenecks** and optimization opportunities  
+- **Recommended batch processing strategies**
+- **Expected performance improvements** (20-50x speedup)
+
+## 🤖 Model Application Strategy
+
+### Current Algorithm (Sequential Processing)
+
+The current pipeline applies models **sequentially for each patch**:
+
+```python
+# Current approach in main.py:89-95
+for patch in tqdm(patches, desc="Обработка патчей"):
+    try:
+        predictions = self.yolo_inference.predict_patch(patch)  # All models for one patch
+        all_predictions.extend(predictions)
+    except Exception as e:
+        print(f"⚠️  Ошибка обработки патча {patch.patch_id}: {e}")
+        continue
+```
+
+**Algorithm Flow:**
+1. **For each patch** (N patches total)
+2. **Apply all models** to the patch (M models)
+3. **Collect predictions** from all models
+4. **Move to next patch**
+
+**Time Complexity:** O(N × M) where N = patches, M = models
+
+### Model Processing Details
+
+```python
+# In yolo_inference.py:72-109
+def predict_patch(self, patch_info: PatchInfo) -> List[Prediction]:
+    all_predictions = []
+    
+    # Apply ALL models to the SAME patch
+    for model_path, model_data in self.loaded_models.items():
+        model = model_data['model']
+        config = model_data['config']
+        
+        # Run inference for this model on this patch
+        results = model(patch_info.image, 
+                      conf=config.min_conf, 
+                      iou=0.5,
+                      max_det=100,
+                      verbose=False)
+        
+        # Process results and add to all_predictions
+        all_predictions.extend(processed_predictions)
+    
+    return all_predictions
+```
+
+### Performance Analysis
+
+**Current Bottlenecks:**
+- **Sequential model loading**: Each model loads separately for each patch
+- **No batching**: Each patch processed individually
+- **Memory inefficiency**: Models loaded multiple times
+- **GPU underutilization**: Single patch doesn't utilize full GPU capacity
+
+**Example with 3 models and 1000 patches:**
+- **Current**: 3,000 model calls (1000 patches × 3 models)
+- **Inefficient**: Each model call processes only 1 patch
+- **GPU utilization**: ~10-20% (single patch doesn't fill GPU)
+
+### Recommended Batch Processing Strategy
+
+#### 1. **Batch-by-Model Approach**
+
+```python
+def process_wsi_batched(self, wsi_path: str, batch_size: int = 32) -> List[Prediction]:
+    """Optimized batch processing"""
+    all_predictions = []
+    
+    # Process each model separately with batching
+    for model_path, model_data in self.loaded_models.items():
+        model = model_data['model']
+        
+        # Create batches of patches for this model
+        for batch_start in range(0, len(patches), batch_size):
+            batch_patches = patches[batch_start:batch_start + batch_size]
+            
+            # Prepare batch tensor
+            batch_images = torch.stack([patch.image for patch in batch_patches])
+            
+            # Single model call for entire batch
+            results = model(batch_images, 
+                          conf=model_data['config'].min_conf,
+                          iou=0.3,
+                          max_det=50,
+                          verbose=False)
+            
+            # Process batch results
+            batch_predictions = self._process_batch_results(results, batch_patches)
+            all_predictions.extend(batch_predictions)
+    
+    return all_predictions
+```
+
+#### 2. **Multi-Model Batch Processing**
+
+```python
+def process_wsi_multi_model_batch(self, wsi_path: str, batch_size: int = 16) -> List[Prediction]:
+    """Process multiple models in parallel batches"""
+    all_predictions = []
+    
+    # Create batches across all models
+    for batch_start in range(0, len(patches), batch_size):
+        batch_patches = patches[batch_start:batch_start + batch_size]
+        
+        # Process all models for this batch
+        batch_predictions = []
+        for model_path, model_data in self.loaded_models.items():
+            model = model_data['model']
+            
+            # Prepare batch for this model
+            batch_images = self._prepare_batch_for_model(batch_patches, model_data)
+            
+            # Run inference
+            results = model(batch_images, 
+                          conf=model_data['config'].min_conf,
+                          iou=0.3,
+                          max_det=50)
+            
+            # Process results
+            model_predictions = self._process_model_results(results, batch_patches, model_data)
+            batch_predictions.extend(model_predictions)
+        
+        all_predictions.extend(batch_predictions)
+    
+    return all_predictions
+```
+
+### Performance Comparison
+
+| Approach | Model Calls | GPU Utilization | Memory Usage | Speed |
+|----------|-------------|-----------------|--------------|-------|
+| **Current (Sequential)** | N × M | 10-20% | Low | 1x |
+| **Batch-by-Model** | M × (N/B) | 60-80% | Medium | 3-5x |
+| **Multi-Model Batch** | N/B | 80-95% | High | 5-10x |
+
+Where: N = patches, M = models, B = batch_size
+
+### Implementation Recommendations
+
+#### 1. **Adaptive Batch Sizing**
+
+```python
+def calculate_optimal_batch_size(model, gpu_memory_gb: float) -> int:
+    """Calculate optimal batch size based on GPU memory"""
+    if gpu_memory_gb >= 24:
+        return 32
+    elif gpu_memory_gb >= 16:
+        return 16
+    elif gpu_memory_gb >= 8:
+        return 8
+    else:
+        return 4
+```
+
+#### 2. **Memory Management**
+
+```python
+def process_with_memory_management(self, patches: List[PatchInfo], batch_size: int):
+    """Process with automatic memory management"""
+    for batch_start in range(0, len(patches), batch_size):
+        batch_patches = patches[batch_start:batch_start + batch_size]
+        
+        try:
+            # Process batch
+            batch_predictions = self._process_batch(batch_patches)
+            yield batch_predictions
+            
+        except torch.cuda.OutOfMemoryError:
+            # Reduce batch size and retry
+            smaller_batch_size = batch_size // 2
+            if smaller_batch_size >= 1:
+                for sub_batch in self._split_batch(batch_patches, smaller_batch_size):
+                    yield self._process_batch(sub_batch)
+            else:
+                # Process individually if batch size is 1
+                for patch in batch_patches:
+                    yield self._process_single_patch(patch)
+        
+        finally:
+            # Clear GPU memory
+            torch.cuda.empty_cache()
+```
+
+#### 3. **Parallel Model Processing**
+
+```python
+import concurrent.futures
+from threading import Lock
+
+def process_models_parallel(self, batch_patches: List[PatchInfo]) -> List[Prediction]:
+    """Process multiple models in parallel for a batch"""
+    all_predictions = []
+    prediction_lock = Lock()
+    
+    def process_model_batch(model_path, model_data):
+        model = model_data['model']
+        batch_images = self._prepare_batch(batch_patches, model_data)
+        
+        results = model(batch_images, 
+                       conf=model_data['config'].min_conf,
+                       iou=0.3,
+                       max_det=50)
+        
+        predictions = self._process_model_results(results, batch_patches, model_data)
+        
+        with prediction_lock:
+            all_predictions.extend(predictions)
+    
+    # Process all models in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.loaded_models)) as executor:
+        futures = []
+        for model_path, model_data in self.loaded_models.items():
+            future = executor.submit(process_model_batch, model_path, model_data)
+            futures.append(future)
+        
+        # Wait for all models to complete
+        concurrent.futures.wait(futures)
+    
+    return all_predictions
+```
+
+### Configuration for Batch Processing
+
+```python
+# Recommended configuration
+BATCH_PROCESSING_CONFIG = {
+    'batch_size': 16,              # Optimal for most GPUs
+    'max_batch_size': 32,          # Maximum batch size
+    'min_batch_size': 4,           # Minimum batch size
+    'memory_threshold': 0.8,       # GPU memory usage threshold
+    'parallel_models': True,       # Process models in parallel
+    'adaptive_batching': True,     # Automatically adjust batch size
+}
+```
+
 ### Memory Management
 
 - **Lazy Loading**: WSI files are loaded on-demand
