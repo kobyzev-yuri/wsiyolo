@@ -28,6 +28,33 @@ ENV/
 .venv/
 .env/
 
+# API keys and secrets
+.env
+*.env
+config.env
+secrets.json
+api_keys.txt
+
+# Archive and experimental files
+archive/
+experimental/
+test_images/
+results_backup/
+
+# Biopsy analysis files (experimental)
+*biopsy*
+*cluster*
+*detect*
+*fix*
+*manual*
+*optimal*
+*select*
+*simple*
+*corrected*
+*improved*
+*numbered*
+*visualization*
+
 # IDE
 .vscode/
 .idea/

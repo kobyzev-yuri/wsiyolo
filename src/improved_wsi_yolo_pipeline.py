@@ -18,6 +18,7 @@ from ultralytics import YOLO
 from monai.data import CuCIMWSIReader
 from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd
 import concurrent.futures
+from shapely.geometry import Polygon
 from dataclasses import asdict
 
 # Импорты наших улучшенных модулей
@@ -176,16 +177,14 @@ class ImprovedWSIYOLOPipeline:
         width = wsi_info['width']
         height = wsi_info['height']
         
-        # Ограничиваем количество патчей для тестирования
-        max_patches = 100  # Для тестирования берем только первые 100 патчей
-        
         print(f"   🔍 Извлечение патчей: WSI {width}x{height}, патч {self.patch_size}x{self.patch_size}")
         
         patch_count = 0
+        total_possible_patches = ((width - self.patch_size) // (self.patch_size - self.overlap) + 1) * ((height - self.patch_size) // (self.patch_size - self.overlap) + 1)
+        print(f"   📈 Всего возможных патчей: {total_possible_patches}")
+        
         for y in range(0, height - self.patch_size + 1, self.patch_size - self.overlap):
             for x in range(0, width - self.patch_size + 1, self.patch_size - self.overlap):
-                if patch_count >= max_patches:
-                    break
                     
                 try:
                     # Извлекаем патч используя CuImage API
@@ -202,24 +201,50 @@ class ImprovedWSIYOLOPipeline:
                         patch_array = np.array(patch_data)
                     
                     if patch_array is not None and patch_array.shape[:2] == (self.patch_size, self.patch_size):
-                        patch_info = PatchInfo(
-                            patch_id=patch_count,
-                            x=x,
-                            y=y,
-                            size=self.patch_size,
-                            image=patch_array
-                        )
-                        patches.append(patch_info)
-                        patch_count += 1
+                        # Проверяем, содержит ли патч ткань (как в оригинальном pipeline)
+                        if self._has_tissue(patch_array):
+                            patch_info = PatchInfo(
+                                patch_id=patch_count,
+                                x=x,
+                                y=y,
+                                size=self.patch_size,
+                                image=patch_array
+                            )
+                            patches.append(patch_info)
+                            patch_count += 1
                         
                 except Exception as e:
                     print(f"⚠️  Ошибка извлечения патча ({x}, {y}): {e}")
                     continue
-            
-            if patch_count >= max_patches:
-                break
         
         return patches
+    
+    def _has_tissue(self, patch_array: np.ndarray) -> bool:
+        """Проверяет, содержит ли патч ткань (адаптировано из оригинального pipeline)"""
+        try:
+            # Конвертируем в HSV для анализа
+            if len(patch_array.shape) == 3 and patch_array.shape[2] == 3:
+                import cv2
+                hsv = cv2.cvtColor(patch_array, cv2.COLOR_RGB2HSV)
+                
+                # Анализируем насыщенность (S канал)
+                saturation = hsv[:, :, 1]
+                
+                # Порог насыщенности для определения ткани
+                tissue_threshold = 30
+                tissue_pixels = np.sum(saturation > tissue_threshold)
+                total_pixels = saturation.size
+                
+                # Если более 10% пикселей имеют высокую насыщенность, считаем это тканью
+                tissue_ratio = tissue_pixels / total_pixels
+                return tissue_ratio > 0.1
+            else:
+                # Если не RGB изображение, считаем что это ткань
+                return True
+                
+        except Exception as e:
+            # В случае ошибки считаем что это ткань
+            return True
     
     def _batch_inference(self, patches: List[PatchInfo]) -> List[Prediction]:
         """Батчинг инференс для всех моделей"""
@@ -275,8 +300,12 @@ class ImprovedWSIYOLOPipeline:
                 if not batch_images:
                     continue
                 
-                # Инференс батча
-                results = model(batch_images, verbose=False)
+                # Инференс батча с повышенным confidence threshold
+                results = model(batch_images, verbose=False, conf=0.7, iou=0.7)
+                
+                # Очищаем память GPU после каждого батча
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 
                 # Обрабатываем результаты
                 for i, result in enumerate(results):
@@ -316,20 +345,67 @@ class ImprovedWSIYOLOPipeline:
                         end=Coords(x=float(box[2]), y=float(box[3]))
                     )
                     
-                    # Создаем предсказание
-                    prediction = Prediction(
-                        class_name=class_name,
-                        box=box_obj,
-                        conf=float(conf),
-                        polygon=None  # Полигон будет добавлен позже
-                    )
+                    # Создаем полигон из маски (как в оригинальном pipeline)
+                    polygon = self._create_polygon_from_mask(result, i, patch)
                     
-                    predictions.append(prediction)
+                    # Фильтрация по размеру объекта
+                    box_width = box[2] - box[0]
+                    box_height = box[3] - box[1]
+                    box_area = box_width * box_height
+                    
+                    # Минимальный и максимальный размер объектов
+                    min_area = 100  # Минимум 10x10 пикселей
+                    max_area = 50000  # Максимум 224x224 пикселей
+                    
+                    if min_area <= box_area <= max_area:
+                        # Создаем предсказание
+                        prediction = Prediction(
+                            class_name=class_name,
+                            box=box_obj,
+                            conf=float(conf),
+                            polygon=polygon
+                        )
+                        
+                        predictions.append(prediction)
+                    else:
+                        # Логируем отфильтрованные объекты
+                        if len(predictions) < 10:  # Только первые 10 для отладки
+                            print(f"   🔍 Отфильтрован объект {class_name}: размер {box_area:.0f} (conf={conf:.3f})")
                     
         except Exception as e:
             print(f"⚠️  Ошибка обработки результата YOLO: {e}")
         
         return predictions
+    
+    def _create_polygon_from_mask(self, result, box_idx: int, patch: PatchInfo) -> Optional[List[Coords]]:
+        """Создает полигон из маски (адаптировано из оригинального pipeline)"""
+        try:
+            # Проверяем, есть ли маски в результате
+            if hasattr(result, 'masks') and result.masks is not None and len(result.masks) > box_idx:
+                mask = result.masks.data[box_idx].cpu().numpy()
+                
+                # Конвертируем маску в полигон
+                from skimage import measure
+                contours = measure.find_contours(mask, 0.5)
+                
+                if contours:
+                    # Берем самый большой контур
+                    largest_contour = max(contours, key=len)
+                    
+                    # Конвертируем в абсолютные координаты
+                    polygon_coords = []
+                    for point in largest_contour:
+                        # YOLO маски в формате (height, width), конвертируем в (x, y)
+                        x = point[1] + patch.x  # Абсолютная X координата
+                        y = point[0] + patch.y  # Абсолютная Y координата
+                        polygon_coords.append(Coords(x=float(x), y=float(y)))
+                    
+                    return polygon_coords
+                    
+        except Exception as e:
+            print(f"⚠️  Ошибка создания полигона: {e}")
+            
+        return None
     
     def _improved_merge_predictions(self, predictions: List[Prediction]) -> List[Prediction]:
         """Улучшенное объединение предсказаний"""
@@ -363,6 +439,8 @@ class ImprovedWSIYOLOPipeline:
                     polygon = Polygon(coords)
                     
                     if polygon.is_valid:
+                        original_points = len(pred.polygon)
+                        
                         # Адаптивное упрощение
                         simplified_polygon, metrics = self.polygon_simplifier.simplify_polygon(polygon)
                         
@@ -377,6 +455,18 @@ class ImprovedWSIYOLOPipeline:
                                 'simplified_points': metrics['simplified_points'],
                                 'area_preserved': metrics['area_preserved'],
                                 'method': metrics['method']
+                            }
+                            
+                            # Отладочная информация для первых нескольких полигонов
+                            if len(simplified_predictions) < 5:
+                                print(f"   🔍 Полигон {len(simplified_predictions)}: {original_points} → {len(simplified_coords)} точек, метод: {metrics['method']}")
+                        else:
+                            # Если упрощение не удалось, добавляем базовые метрики
+                            pred.simplification_metrics = {
+                                'original_points': original_points,
+                                'simplified_points': original_points,
+                                'area_preserved': 1.0,
+                                'method': 'no_simplification_needed'
                             }
                 
                 simplified_predictions.append(pred)
